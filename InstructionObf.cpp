@@ -86,15 +86,14 @@ struct InstructionObf : llvm::PassInfoMixin<InstructionObf> {
 
         auto *op1 = instr->getOperand(0);
         auto *op2 = instr->getOperand(1);
-        // builder.CreateAlloca(llvm::Type::getInt8PtrTy(ctx));
 
         auto *v1 = builder.CreateNot(op1);
         auto *v2 = builder.CreateNot(op2);
         auto *v3 = builder.CreateAnd(v1, op2);
         auto *v4 = builder.CreateAnd(op1, v2);
-        auto *v = builder.CreateOr(v3, v4);
+        auto *v5 = builder.CreateOr(v3, v4);
 
-        instr->replaceAllUsesWith(v);
+        instr->replaceAllUsesWith(v5);
     }
 };
 
