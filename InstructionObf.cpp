@@ -40,6 +40,12 @@ struct InstructionObf : llvm::PassInfoMixin<InstructionObf> {
         case llvm::Instruction::Xor:
             handleXOR(F, instr);
             break;
+        case llvm::Instruction::Add:
+            handleADD(F, instr);
+            break;
+        case llvm::Instruction::Sub:
+            handleSUB(F, instr);
+            break;
         default:
             return;
         }
@@ -94,6 +100,36 @@ struct InstructionObf : llvm::PassInfoMixin<InstructionObf> {
         auto *v5 = builder.CreateOr(v3, v4);
 
         instr->replaceAllUsesWith(v5);
+    }
+
+    void handleADD(llvm::Function &F, llvm::BinaryOperator *instr) {
+        // replace a + b with -(-a - b)
+        auto &ctx = F.getContext();
+        llvm::IRBuilder<> builder(instr);
+
+        auto *op1 = instr->getOperand(0);
+        auto *op2 = instr->getOperand(1);
+
+        auto *v1 = builder.CreateNeg(op1);
+        auto *v2 = builder.CreateSub(v1, op2);
+        auto *v3 = builder.CreateNeg(v2);
+
+        instr->replaceAllUsesWith(v3);
+    }
+
+    void handleSUB(llvm::Function &F, llvm::BinaryOperator *instr) {
+        // replace a - b with -(-a + b)
+        auto &ctx = F.getContext();
+        llvm::IRBuilder<> builder(instr);
+
+        auto *op1 = instr->getOperand(0);
+        auto *op2 = instr->getOperand(1);
+
+        auto *v1 = builder.CreateNeg(op1);
+        auto *v2 = builder.CreateAdd(v1, op2);
+        auto *v3 = builder.CreateNeg(v2);
+
+        instr->replaceAllUsesWith(v3);
     }
 };
 
