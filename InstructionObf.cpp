@@ -104,17 +104,36 @@ struct InstructionObf : llvm::PassInfoMixin<InstructionObf> {
 
     void handleADD(llvm::Function &F, llvm::BinaryOperator *instr) {
         // replace a + b with -(-a - b)
+        // random mode a + b => -(-(a + r) - (b - r))
         auto &ctx = F.getContext();
         llvm::IRBuilder<> builder(instr);
 
         auto *op1 = instr->getOperand(0);
         auto *op2 = instr->getOperand(1);
 
-        auto *v1 = builder.CreateNeg(op1);
-        auto *v2 = builder.CreateSub(v1, op2);
-        auto *v3 = builder.CreateNeg(v2);
+        static std::random_device dev;
+        static std::mt19937 rng(dev());
+        static std::uniform_int_distribution<std::mt19937::result_type> dist(0, 0xffffffff);
 
-        instr->replaceAllUsesWith(v3);
+        bool random_mode = dist(rng) > 0xffffffff / 2;
+
+        if (random_mode) {
+            auto *type = instr->getType();
+            auto *v1 = llvm::ConstantInt::get(type, dist(rng));
+            auto *v2 = builder.CreateAdd(op1, v1);
+            auto *v3 = builder.CreateNeg(v2);
+            auto *v4 = builder.CreateSub(op2, v1);
+            auto *v5 = builder.CreateSub(v3, v4);
+            auto *v6 = builder.CreateNeg(v5);
+            
+            instr->replaceAllUsesWith(v6);
+        } else {
+            auto *v1 = builder.CreateNeg(op1);
+            auto *v2 = builder.CreateSub(v1, op2);
+            auto *v3 = builder.CreateNeg(v2);
+
+            instr->replaceAllUsesWith(v3);
+        }
     }
 
     void handleSUB(llvm::Function &F, llvm::BinaryOperator *instr) {
