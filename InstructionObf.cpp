@@ -138,17 +138,35 @@ struct InstructionObf : llvm::PassInfoMixin<InstructionObf> {
 
     void handleSUB(llvm::Function &F, llvm::BinaryOperator *instr) {
         // replace a - b with -(-a + b)
+        // random mode a - b => -(-a - r + b + r)
         auto &ctx = F.getContext();
         llvm::IRBuilder<> builder(instr);
 
         auto *op1 = instr->getOperand(0);
         auto *op2 = instr->getOperand(1);
 
-        auto *v1 = builder.CreateNeg(op1);
-        auto *v2 = builder.CreateAdd(v1, op2);
-        auto *v3 = builder.CreateNeg(v2);
+        static std::random_device dev;
+        static std::mt19937 rng(dev());
+        static std::uniform_int_distribution<std::mt19937::result_type> dist(0, 0xffffffff);
 
-        instr->replaceAllUsesWith(v3);
+        bool random_mode = dist(rng) > 0xffffffff / 2;
+
+        if (random_mode) {
+            auto *type = instr->getType();
+            auto *v1 = llvm::ConstantInt::get(type, dist(rng));
+            auto *v2 = builder.CreateNeg(op1);
+            auto *v3 = builder.CreateSub(v2, v1);
+            auto *v4 = builder.CreateAdd(op2, v3);
+            auto *v5 = builder.CreateAdd(v4, v1);
+
+            instr->replaceAllUsesWith(v5);
+        } else {
+            auto *v1 = builder.CreateNeg(op1);
+            auto *v2 = builder.CreateAdd(v1, op2);
+            auto *v3 = builder.CreateNeg(v2);
+
+            instr->replaceAllUsesWith(v3);
+        }
     }
 };
 
